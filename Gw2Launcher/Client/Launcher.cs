@@ -4505,6 +4505,17 @@ namespace Gw2Launcher.Client
                     KillMutex(type);
 
                     var processOptions = GetProcessStartInfo(q, customProfile, fi);
+
+                    // Deploy the version.dll mutex proxy instead of killing the mutex
+                    // via NT APIs. The proxy hooks CreateMutex so each GW2 instance
+                    // creates an unnamed mutex — no named mutex to conflict with.
+                    if (mode == LaunchMode.Launch)
+                    {
+                        Util.MutexProxy.EnsureProxyDeployed(fi.FullName);
+
+                        if (Settings.IsRunningWine)
+                            Util.MutexProxy.SetEnvironment(processOptions.Variables);
+                    }
                     var isWindowed = IsWindowed(account.Settings);
                     var renameCef = false;
                     var isCoherent = false;
@@ -6048,6 +6059,10 @@ namespace Gw2Launcher.Client
 
         private static bool KillMutex(AccountType type)
         {
+            // version.dll proxy handles the mutex — no need to kill via NT APIs
+            return true;
+
+            /* Original NT API mutex killing
             bool killed = false;
 
             foreach (LinkedProcess p in LinkedProcess.GetActive())
@@ -6074,10 +6089,15 @@ namespace Gw2Launcher.Client
             }
 
             return killed;
+            */
         }
 
         private static bool IsMutexOpen(AccountType type)
         {
+            // version.dll proxy prevents GW2 from creating the named mutex
+            return false;
+
+            /* Original mutex check
             var alive = false;
 
             Mutex mutex;
@@ -6100,6 +6120,7 @@ namespace Gw2Launcher.Client
             }
 
             return alive;
+            */
         }
 
         /// <summary>

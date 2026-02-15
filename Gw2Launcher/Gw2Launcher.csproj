@@ -800,6 +800,7 @@
     <Compile Include="Windows\FileDialog.cs" />
     <Compile Include="Windows\FindWindow.cs" />
     <Compile Include="Util\ProcessUtil.cs" />
+    <Compile Include="Util\MutexProxy.cs" />
     <Compile Include="Security\Credentials.cs" />
     <Compile Include="Settings.cs" />
     <Compile Include="UI\Controls\AccountGridButtonContainer.cs">
@@ -851,6 +852,9 @@
       <Generator>ResXFileCodeGenerator</Generator>
       <SubType>Designer</SubType>
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\version_proxy.dll">
+      <LogicalName>Gw2Launcher.Resources.version_proxy.dll</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="UI\Controls\NoteMessage.resx">
       <DependentUpon>NoteMessage.cs</DependentUpon>
