@@ -948,7 +948,7 @@ namespace Gw2Launcher.Client
 
                 Action wait = delegate
                 {
-                    NativeMethods.SendMessage(handle, 0, 0, 0);
+                    NativeMethods.SendMessage(handle, (uint)0, (uint)0, (uint)0);
                 };
 
                 //disabling to prevent interference from clicking (changes focus) - it'll still process keyboard input

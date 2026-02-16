@@ -75,7 +75,7 @@ namespace Gw2Launcher.UI
 
             try
             {
-                this.Invoke(new MethodInvoker(
+                this.Invoke(new System.Windows.Forms.MethodInvoker(
                     delegate
                     {
                         listAccounts.Items.Clear();

@@ -19,7 +19,7 @@ namespace Gw2Launcher.Util
                 var security = new System.Security.AccessControl.FileSecurity();
                 var usersSid = new SecurityIdentifier(WellKnownSidType.BuiltinUsersSid, null);
                 security.AddAccessRule(new FileSystemAccessRule(usersSid, rights, AccessControlType.Allow));
-                File.SetAccessControl(path, security);
+                new FileInfo(path).SetAccessControl(security);
                 return true;
             }
             catch (Exception e)
@@ -33,7 +33,7 @@ namespace Gw2Launcher.Util
         {
             try
             {
-                var security = Directory.GetAccessControl(path, AccessControlSections.Access);
+                var security = new DirectoryInfo(path).GetAccessControl(AccessControlSections.Access);
                 var usersSid = new SecurityIdentifier(WellKnownSidType.BuiltinUsersSid, null);
                 var rules = security.GetAccessRules(true, false, typeof(SecurityIdentifier));
                 var inheritance = InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit;
@@ -54,7 +54,7 @@ namespace Gw2Launcher.Util
 
                 security = new System.Security.AccessControl.DirectorySecurity();
                 security.AddAccessRule(new FileSystemAccessRule(usersSid, rights, inheritance, PropagationFlags.None, AccessControlType.Allow));
-                Directory.SetAccessControl(path, security);
+                new DirectoryInfo(path).SetAccessControl(security);
 
                 return true;
             }
@@ -67,7 +67,7 @@ namespace Gw2Launcher.Util
 
         public static bool HasFolderPermissions(string path, FileSystemRights rights)
         {
-            var security = Directory.GetAccessControl(path, AccessControlSections.Access);
+            var security = new DirectoryInfo(path).GetAccessControl(AccessControlSections.Access);
             var rules = security.GetAccessRules(true, true, typeof(SecurityIdentifier));
             var usersSid = new SecurityIdentifier(WellKnownSidType.BuiltinUsersSid, null);
             var inheritance = InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit;
@@ -329,9 +329,10 @@ namespace Gw2Launcher.Util
 
             if (inheritPermissions)
             {
-                var ac = File.GetAccessControl(to);
+                var fi = new FileInfo(to);
+                var ac = fi.GetAccessControl();
                 ac.SetAccessRuleProtection(false, false);
-                File.SetAccessControl(to, ac);
+                fi.SetAccessControl(ac);
             }
         }
     }

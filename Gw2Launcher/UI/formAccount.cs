@@ -3581,20 +3581,18 @@ namespace Gw2Launcher.UI
 
         private void labelGfxPreset_Click(object sender, EventArgs e)
         {
-            var items = new MenuItem[5];
-            var i = 0;
+            var menu = new ContextMenuStrip();
 
             foreach (var preset in new GraphicsPreset[] { GraphicsPreset.Lowest, GraphicsPreset.Low, GraphicsPreset.Medium, GraphicsPreset.High, GraphicsPreset.Ultra })
             {
-                items[i++] = new MenuItem(preset.ToString(), 
-                    delegate
-                    {
-                        SetGraphicsPreset(preset);
-                    });
+                var p = preset;
+                menu.Items.Add(preset.ToString(), null, delegate
+                {
+                    SetGraphicsPreset(p);
+                });
             }
 
-            var menu = new System.Windows.Forms.ContextMenu(items);
-            menu.Collapse += delegate
+            menu.Closed += delegate
             {
                 menu.Dispose();
             };

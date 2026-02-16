@@ -1,7 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
-using System.Security.Permissions;
 using Microsoft.Win32.SafeHandles;
 using System.Runtime.ConstrainedExecution;
 using System.Security;
@@ -15,13 +14,34 @@ namespace Gw2Launcher.Security
         private const int LOGON32_LOGON_INTERACTIVE = 2;
 
         private static WindowsIdentity defaultIdentity;
-        
+
         [DllImport(NativeMethods.ADVAPI32, SetLastError = true, CharSet = CharSet.Unicode)]
         private static extern bool LogonUser(String lpszUsername, String lpszDomain, IntPtr lpszPassword, int dwLogonType, int dwLogonProvider, out SafeTokenHandle phToken);
+
+        [DllImport(NativeMethods.ADVAPI32, SetLastError = true)]
+        private static extern bool ImpersonateLoggedOnUser(IntPtr hToken);
+
+        [DllImport(NativeMethods.ADVAPI32, SetLastError = true)]
+        private static extern bool RevertToSelf();
 
         public interface IIdentity : IDisposable
         {
             IDisposable Impersonate();
+        }
+
+        private class ImpersonationContext : IDisposable
+        {
+            public void Dispose()
+            {
+                RevertToSelf();
+            }
+        }
+
+        private static IDisposable ImpersonateToken(IntPtr tokenHandle)
+        {
+            if (!ImpersonateLoggedOnUser(tokenHandle))
+                throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+            return new ImpersonationContext();
         }
 
         private class ImpersonationToken : IDisposable
@@ -32,7 +52,7 @@ namespace Gw2Launcher.Security
                 {
                     this.Token = token;
                     this.Identity = new WindowsIdentity(token.DangerousGetHandle());
-                    this.Context = this.Identity.Impersonate();
+                    this.Context = ImpersonateToken(token.DangerousGetHandle());
                 }
                 catch (Exception e)
                 {
@@ -42,7 +62,7 @@ namespace Gw2Launcher.Security
                 }
             }
 
-            public ImpersonationToken(WindowsImpersonationContext context)
+            public ImpersonationToken(IDisposable context)
             {
                 this.Context = context;
             }
@@ -59,7 +79,7 @@ namespace Gw2Launcher.Security
                 private set;
             }
 
-            public WindowsImpersonationContext Context
+            public IDisposable Context
             {
                 get;
                 private set;
@@ -122,7 +142,7 @@ namespace Gw2Launcher.Security
 
             public IDisposable Impersonate()
             {
-                return identity.Impersonate();
+                return ImpersonateToken(identity.Token);
             }
 
             public void Dispose()
@@ -211,7 +231,7 @@ namespace Gw2Launcher.Security
         /// <returns>Token to cancel the impersonation</returns>
         public static IDisposable Impersonate()
         {
-            return defaultIdentity.Impersonate();
+            return ImpersonateToken(defaultIdentity.Token);
         }
 
         public static IDisposable Impersonate(IIdentity identity)
