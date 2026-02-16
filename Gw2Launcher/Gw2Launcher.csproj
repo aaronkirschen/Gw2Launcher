@@ -37,7 +37,14 @@
     <EmbeddedResource Include="Resources\version_proxy.dll">
       <LogicalName>Gw2Launcher.Resources.version_proxy.dll</LogicalName>
     </EmbeddedResource>
+    <None Remove="Resources\version_proxy\**" />
   </ItemGroup>
+
+  <Target Name="BuildVersionProxy" BeforeTargets="BeforeBuild"
+          Inputs="Resources\version_proxy\version_proxy.cpp;Resources\version_proxy\version_proxy.def"
+          Outputs="Resources\version_proxy.dll">
+    <Exec Command="x86_64-w64-mingw32-g++ -shared -o Resources/version_proxy.dll Resources/version_proxy/version_proxy.cpp Resources/version_proxy/version_proxy.def -static" />
+  </Target>
 
   <ItemGroup>
     <PackageReference Include="System.DirectoryServices.AccountManagement" Version="9.0.*" />
