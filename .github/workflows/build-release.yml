@@ -1,0 +1,102 @@
+name: Build and release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    name: Build win-x64 package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Install MinGW-w64
+        run: sudo apt-get update && sudo apt-get install --yes g++-mingw-w64-x86-64 zip
+
+      - name: Publish self-contained executable
+        run: |
+          dotnet publish Gw2Launcher/Gw2Launcher.csproj \
+            --configuration Release \
+            --runtime win-x64 \
+            --self-contained true \
+            -p:PublishSingleFile=true \
+            --output artifacts/publish
+
+      - name: Package release
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            version="${GITHUB_REF_NAME}"
+          else
+            version="${GITHUB_SHA:0:7}"
+          fi
+
+          archive="Gw2Launcher-${version}-win-x64.zip"
+          symbols="Gw2Launcher-${version}-win-x64.pdb"
+
+          mkdir -p artifacts/package
+          cp artifacts/publish/Gw2Launcher.exe artifacts/package/
+          cp artifacts/publish/Gw2Launcher.dll.config artifacts/package/
+          cp README.md LICENSE.md artifacts/package/
+          cp artifacts/publish/Gw2Launcher.pdb "artifacts/${symbols}"
+
+          (
+            cd artifacts/package
+            zip "../${archive}" Gw2Launcher.exe Gw2Launcher.dll.config README.md LICENSE.md
+          )
+
+          (
+            cd artifacts
+            sha256sum "${archive}" "${symbols}" > SHA256SUMS.txt
+          )
+
+      - name: Upload test artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Gw2Launcher-win-x64
+          path: |
+            artifacts/Gw2Launcher-*-win-x64.zip
+            artifacts/Gw2Launcher-*-win-x64.pdb
+            artifacts/SHA256SUMS.txt
+          if-no-files-found: error
+
+  release:
+    name: Publish tagged release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download tested artifacts
+        uses: actions/download-artifact@v5
+        with:
+          name: Gw2Launcher-win-x64
+          path: artifacts
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            artifacts/Gw2Launcher-*-win-x64.zip \
+            artifacts/Gw2Launcher-*-win-x64.pdb \
+            artifacts/SHA256SUMS.txt \
+            --verify-tag \
+            --generate-notes \
+            --title "Gw2Launcher ${GITHUB_REF_NAME}"

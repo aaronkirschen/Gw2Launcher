@@ -1,0 +1,10 @@
+.vs/
+.idea/
+.claude/
+**/bin/
+**/obj/
+artifacts/
+Gw2Launcher/Resources/version_proxy.dll
+dotnet-install.sh
+*.user
+*.suo
