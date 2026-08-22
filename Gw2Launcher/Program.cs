@@ -1176,44 +1176,13 @@ namespace Gw2Launcher
 
         private static Mutex CreateMutex()
         {
-            var mutex = new Mutex(false, MUTEX_NAME);
-            var hasMutex = false;
+            bool createdNew;
+            var mutex = new Mutex(true, MUTEX_NAME, out createdNew);
 
-            try
+            if (!createdNew)
             {
-                var retry = 0;
-
-                while (true)
-                {
-                    try
-                    {
-                        hasMutex = mutex.WaitOne(0);
-                        break;
-                    }
-                    catch (AbandonedMutexException e)
-                    {
-                        using (e.Mutex) { }
-
-                        ++retry;
-
-                        if (retry > 3)
-                        {
-                            throw;
-                        }
-                        else if (retry > 1)
-                        {
-                            Thread.Sleep(500);
-                        }
-                    }
-                }
-            }
-            finally
-            {
-                if (!hasMutex)
-                {
-                    using (mutex) { }
-                    mutex = null;
-                }
+                mutex.Dispose();
+                return null;
             }
 
             return mutex;
