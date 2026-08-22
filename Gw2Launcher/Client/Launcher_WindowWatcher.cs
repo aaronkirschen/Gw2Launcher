@@ -857,10 +857,22 @@ namespace Gw2Launcher.Client
             /// Finds child processes
             /// </summary>
             /// <param name="parent">Parent process</param>
+            private static DateTime GetStartTimeOrMinValue(Process process)
+            {
+                try
+                {
+                    return process.StartTime;
+                }
+                catch (ArgumentOutOfRangeException)
+                {
+                    return DateTime.MinValue;
+                }
+            }
+
             private IEnumerable<ProcessInfo> EnumerateChildProcesses(Process parent)
             {
                 var pid = parent.Id;
-                var startTime = parent.StartTime;
+                var startTime = GetStartTimeOrMinValue(parent);
 
                 if (canReadMemory)
                 {
@@ -874,7 +886,7 @@ namespace Gw2Launcher.Client
 
                             try
                             {
-                                b = pi.Open(p.Id) && pi.GetParent() == pid && p.StartTime >= startTime;
+                                b = pi.Open(p.Id) && pi.GetParent() == pid && GetStartTimeOrMinValue(p) >= startTime;
                             }
                             catch (Exception e)
                             {
@@ -907,7 +919,7 @@ namespace Gw2Launcher.Client
                                 try
                                 {
                                     p = Process.GetProcessById((int)(uint)o["ProcessId"]);
-                                    b = p.StartTime >= startTime;
+                                    b = GetStartTimeOrMinValue(p) >= startTime;
                                 }
                                 catch
                                 {
@@ -938,7 +950,7 @@ namespace Gw2Launcher.Client
             {
                 var i = 0;
                 var pid = parent.Id;
-                var startTime = parent.StartTime;
+                var startTime = GetStartTimeOrMinValue(parent);
 
                 if (canReadMemory)
                 {
@@ -957,7 +969,7 @@ namespace Gw2Launcher.Client
                                     {
                                         if (pi.Open(p.Id))
                                         {
-                                            if (pi.GetParent() == pid && p.StartTime >= startTime)
+                                            if (pi.GetParent() == pid && GetStartTimeOrMinValue(p) >= startTime)
                                             {
                                                 cids[i++] = p.Id;
                                                 noChild = i < cids.Length;
@@ -987,7 +999,7 @@ namespace Gw2Launcher.Client
                                 var cid = (int)(uint)o["ProcessId"];
                                 using (var p = Process.GetProcessById(cid))
                                 {
-                                    if (p.StartTime >= startTime)
+                                    if (GetStartTimeOrMinValue(p) >= startTime)
                                     {
                                         cids[i++] = cid;
                                         if (i == cids.Length)

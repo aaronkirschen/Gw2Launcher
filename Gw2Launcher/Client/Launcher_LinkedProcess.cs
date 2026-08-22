@@ -444,12 +444,6 @@ namespace Gw2Launcher.Client
 
             public bool KillMutex(bool test = false)
             {
-                // The version.dll proxy handles the mutex by hooking CreateMutex
-                // to create unnamed mutexes. No need to kill via NT APIs.
-                this.HasMutex = false;
-                return true;
-
-                /* Original NT API mutex killing — replaced by version.dll proxy
                 if (!Util.Users.IsCurrentUser(account.Settings.WindowsAccount))
                 {
                     string username = Util.Users.GetUserName(account.Settings.WindowsAccount);
@@ -476,16 +470,10 @@ namespace Gw2Launcher.Client
                 this.HasMutex = false;
 
                 return true;
-                */
             }
 
             private bool _KillMutex(bool test)
             {
-                if (test && !IsMutexOpen(account.Type))
-                {
-                    return true;
-                }
-
                 var p = this.Process;
                 var hasWindow = false;
                 var name = Util.ProcessUtil.GetMutexName(this.account.Settings.Type);

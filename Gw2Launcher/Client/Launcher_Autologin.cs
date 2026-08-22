@@ -948,7 +948,17 @@ namespace Gw2Launcher.Client
 
                 Action wait = delegate
                 {
-                    NativeMethods.SendMessage(handle, (uint)0, (uint)0, (uint)0);
+                    //Synchronizing a top-level CEF window can block even when
+                    //SendMessageTimeout is used. Posted text entry already includes a
+                    //bounded delay, so don't perform this flush for CEF launchers.
+                    if (q.Account.hostType == WindowWatcher.HostType.CEF)
+                        return;
+
+                    UIntPtr result;
+                    if (NativeMethods.SendMessageTimeout(handle, 0, UIntPtr.Zero, IntPtr.Zero, 0x2, 1000, out result) == IntPtr.Zero && Util.Logging.Enabled)
+                    {
+                        Util.Logging.LogEvent(q.Account.Settings, "Timed out waiting for launcher input");
+                    }
                 };
 
                 //disabling to prevent interference from clicking (changes focus) - it'll still process keyboard input
@@ -986,6 +996,11 @@ namespace Gw2Launcher.Client
                     if (Util.Logging.Enabled)
                     {
                         Util.Logging.LogEvent(q.Account.Settings, "Beginning login entry for " + GetLauncherType() + " type at " + coord + " (" + widthClient + " x " + heightClient + ")");
+                    }
+
+                    if (q.Account.hostType == WindowWatcher.HostType.CEF)
+                    {
+                        return await DoCefLogin(q, handle, coord);
                     }
 
                     int tabs; //number of tabs to reach the email
@@ -1085,7 +1100,6 @@ namespace Gw2Launcher.Client
 
                     //paste
                     var c = Security.Credentials.ToCharArray(q.Account.Settings.Password.ToSecureString());
-
                     try
                     {
                         if (Util.Logging.Enabled)
@@ -1325,6 +1339,160 @@ namespace Gw2Launcher.Client
 
                     Windows.WindowLong.Remove(handle, GWL.GWL_STYLE, WindowStyle.WS_DISABLED);
                 }
+            }
+
+            private async Task<bool> DoCefLogin(QueuedAccount q, IntPtr handle, uint coord)
+            {
+                var clipboard = new ClipboardText();
+
+                if (!await CanUseClipboard() || IsPrivilegedProcessFocused())
+                {
+                    if (Util.Logging.Enabled)
+                        Util.Logging.LogEvent(q.Account.Settings, "CEF login failed: clipboard input is unavailable");
+
+                    return false;
+                }
+
+                try
+                {
+                    if (!await WaitForKeys(System.Windows.Forms.Keys.Shift | System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.Alt, 5000))
+                        return false;
+
+                    if (Util.Logging.Enabled)
+                        Util.Logging.LogEvent(q.Account.Settings, "CEF login: focusing email field");
+
+                    NativeMethods.SendMessage(handle, 0x0201, 1, coord); //WM_LBUTTONDOWN
+                    NativeMethods.SendMessage(handle, 0x0202, 0, coord); //WM_LBUTTONUP
+                    await Task.Delay(150);
+
+                    Windows.Keyboard.SendKey(handle, System.Windows.Forms.Keys.Tab, Windows.Keyboard.KeyMessage.Down, false, 14);
+                    Windows.Keyboard.SendKey(handle, System.Windows.Forms.Keys.Tab, Windows.Keyboard.KeyMessage.Up, false);
+                    await Task.Delay(150);
+
+                    if (!IsHandleOkay(q))
+                        return false;
+
+                    if (Util.Logging.Enabled)
+                        Util.Logging.LogEvent(q.Account.Settings, "CEF login: pasting email");
+
+                    if (!await DoTextEntry(q, Settings.LoginInputType.Clipboard, handle, q.Account.Settings.Email, clipboard))
+                    {
+                        if (Util.Logging.Enabled)
+                            Util.Logging.LogEvent(q.Account.Settings, "CEF login failed: email field did not request clipboard data");
+
+                        return false;
+                    }
+
+                    if (!await VerifyCefEmail(q, handle))
+                        return false;
+
+                    if (!await WaitForKeys(System.Windows.Forms.Keys.Shift | System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.Alt, 5000))
+                        return false;
+
+                    Windows.Keyboard.SendKey(handle, System.Windows.Forms.Keys.Tab, Windows.Keyboard.KeyMessage.Press, false);
+                    await Task.Delay(150);
+
+                    if (!IsHandleOkay(q))
+                        return false;
+
+                    if (Util.Logging.Enabled)
+                        Util.Logging.LogEvent(q.Account.Settings, "CEF login: loading saved password");
+
+                    var password = Security.Credentials.ToCharArray(q.Account.Settings.Password.ToSecureString());
+
+                    try
+                    {
+                        if (Util.Logging.Enabled)
+                            Util.Logging.LogEvent(q.Account.Settings, "CEF login: pasting password");
+
+                        if (!await DoTextEntry(q, Settings.LoginInputType.Clipboard, handle, password, clipboard))
+                        {
+                            if (Util.Logging.Enabled)
+                                Util.Logging.LogEvent(q.Account.Settings, "CEF login failed: password field did not request clipboard data");
+
+                            return false;
+                        }
+                    }
+                    finally
+                    {
+                        Array.Clear(password, 0, password.Length);
+                    }
+
+                    if (Util.Logging.Enabled)
+                        Util.Logging.LogEvent(q.Account.Settings, "Login entry complete");
+
+                    if (!Settings.DisableAutomaticLogins.Value)
+                    {
+                        if (!await WaitForKeys(System.Windows.Forms.Keys.Alt | System.Windows.Forms.Keys.Control, 5000))
+                            return false;
+
+                        if (!IsHandleOkay(q))
+                            return false;
+
+                        Windows.Keyboard.SendKey(handle, System.Windows.Forms.Keys.Return, Windows.Keyboard.KeyMessage.Down, true);
+                    }
+
+                    return true;
+                }
+                finally
+                {
+                    if (clipboard.HasText)
+                        await Windows.Clipboard.SetClipboardText(clipboard.Text, 1000);
+                }
+            }
+
+            private async Task<bool> VerifyCefEmail(QueuedAccount q, IntPtr handle)
+            {
+                for (var attempt = 1; attempt <= 2; ++attempt)
+                {
+                    if (!IsHandleOkay(q))
+                        return false;
+
+                    if (!await Windows.Clipboard.SetClipboardText(""))
+                    {
+                        if (Util.Logging.Enabled)
+                            Util.Logging.LogEvent(q.Account.Settings, "CEF login failed: unable to prepare email verification");
+
+                        return false;
+                    }
+
+                    using (var listener = Windows.Clipboard.AddListener())
+                    {
+                        listener.Reset();
+
+                        try
+                        {
+                            Windows.Keyboard.SetKeyState(System.Windows.Forms.Keys.ControlKey, true);
+                            Windows.Keyboard.SendKey(handle, System.Windows.Forms.Keys.A, Windows.Keyboard.KeyMessage.Press, false);
+                            Windows.Keyboard.SendKey(handle, System.Windows.Forms.Keys.C, Windows.Keyboard.KeyMessage.Press, false);
+                        }
+                        finally
+                        {
+                            Windows.Keyboard.SetKeyState(System.Windows.Forms.Keys.ControlKey, false);
+                        }
+
+                        if (listener.Enabled)
+                            await listener.Wait(1500, false);
+                        else
+                            await Task.Delay(500);
+                    }
+
+                    var actual = await Windows.Clipboard.GetClipboardText(500);
+                    var expected = q.Account.Settings.Email.Replace(" ", "");
+
+                    if (actual != null && expected.Equals(actual.Replace(" ", ""), StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (Util.Logging.Enabled)
+                            Util.Logging.LogEvent(q.Account.Settings, "CEF login: email verified");
+
+                        return true;
+                    }
+
+                    if (Util.Logging.Enabled)
+                        Util.Logging.LogEvent(q.Account.Settings, attempt == 1 ? "CEF login: retrying email verification" : "CEF login failed: email verification did not match");
+                }
+
+                return false;
             }
             
 

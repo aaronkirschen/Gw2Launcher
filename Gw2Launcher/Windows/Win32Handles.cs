@@ -665,7 +665,10 @@ namespace Gw2Launcher.Windows
             var infoClass = SYSTEM_INFORMATION_CLASS.SystemExtendedHandleInformation;
             int infoLength = 0x10000;
             var _processId = (UIntPtr)processId;
-            var _type = GetHandleTypeIndex(type);
+            // Wine's object type indexes are not guaranteed to match the table
+            // returned by the Windows-oriented type discovery code. A targeted
+            // PID search can safely identify the object by its queried name.
+            var _type = processId > 0 ? (short)-1 : GetHandleTypeIndex(type);
             Buffer[] buffers = null;
 
             var _info = Marshal.AllocHGlobal(infoLength);
@@ -748,7 +751,10 @@ namespace Gw2Launcher.Windows
                     buffers[j] = new Buffer(256);
                 }
 
-                var canQuery = infoClass == SYSTEM_INFORMATION_CLASS.SystemExtendedHandleInformation && !Settings.IsRunningWine;
+                // Wine does not implement NameInformationLength in
+                // ObjectBasicInformation. Proton/UMU also makes IsRunningWine
+                // unreliable, so query ObjectNameInformation directly.
+                var canQuery = false;
 
                 //warning: NtQueryObject can cause a deadlock when querying an item that is waiting
 

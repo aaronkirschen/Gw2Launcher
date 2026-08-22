@@ -208,6 +208,9 @@ namespace Gw2Launcher.Windows.Native
         internal static extern IntPtr SendMessage(IntPtr hWnd, WindowMessages Msg, IntPtr wParam, IntPtr lParam);
 
         [DllImport(USER32, SetLastError = true, CharSet = CharSet.Auto)]
+        internal static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, UIntPtr wParam, IntPtr lParam, uint flags, uint timeout, out UIntPtr result);
+
+        [DllImport(USER32, SetLastError = true, CharSet = CharSet.Auto)]
         internal static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, uint wParam, uint lParam);
 
         [DllImport(USER32, SetLastError = true, CharSet = CharSet.Auto)]
