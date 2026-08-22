@@ -1,6 +1,6 @@
 # Gw2Launcher — .NET 10 and Wine-compatible fork
 
-This fork of [Healix/Gw2Launcher](https://github.com/Healix/Gw2Launcher) modernizes the launcher to .NET 10 and replaces its low-level mutex-killing implementation with a DLL proxy designed to work on both Windows and Wine/Proton.
+This fork of [Healix/Gw2Launcher](https://github.com/Healix/Gw2Launcher) modernizes the launcher to .NET 10 and makes its multi-instance and automatic-login behavior work under Wine/Proton.
 
 Gw2Launcher manages multiple Guild Wars 2 accounts and allows multiple clients to run at the same time.
 
@@ -15,29 +15,25 @@ Extract the ZIP somewhere writable and run:
 
 The release is self-contained; users do not need to install .NET separately.
 
-> **Current test status:** the self-contained Release build and a clean launch under Wine 11.16 have been verified on Arch Linux. Full multi-account launching and mutex-proxy behavior still require end-to-end testing with Guild Wars 2 before the first stable release.
+> **Current test status:** the self-contained Release build, automatic credential entry, and two simultaneous Guild Wars 2 clients have been verified on Arch Linux with GE-Proton 11-5.
 
 ## What this fork changes
 
 ### Wine-compatible multi-instance handling
 
-Guild Wars 2 creates a named mutex to prevent multiple clients from running. Upstream Gw2Launcher finds and closes that mutex using Windows NT handle APIs.
+Guild Wars 2 creates a named mutex to prevent multiple clients from running. Gw2Launcher finds that mutex in the active GW2 process and closes its handle before launching another account.
 
-This fork instead builds and embeds a `version.dll` proxy that:
+Wine does not provide all object metadata in the same way as Windows. Targeted mutex searches therefore query object names directly and avoid relying on Wine's object-type indexes. No DLL proxy or `WINEDLLOVERRIDES` configuration is required.
 
-1. Is deployed beside `Gw2-64.exe` when launching in multi-instance mode.
-2. Forwards normal `version.dll` calls to the real system library.
-3. Intercepts GW2's mutex creation and substitutes an unnamed mutex.
-4. Sets `WINEDLLOVERRIDES=version=n,b` for Wine/Proton so the native proxy is loaded before Wine's built-in DLL.
+### Reliable CEF credential entry
 
-The game still receives a valid mutex handle, but the named single-instance mutex is never created.
+The Guild Wars 2 launcher uses CEF for its login interface. Under Wine/Proton, posted character messages could appear successful without entering the password. The Wine-compatible path uses clipboard-based entry, verifies the email field, and restores the previous clipboard contents afterward.
 
 ### Modern self-contained build
 
 - Migrated from .NET Framework 4.7.2 to `net10.0-windows`
 - Uses an SDK-style project
 - Publishes a self-contained, single-file `win-x64` executable
-- Builds the native mutex proxy from source with MinGW-w64
 - Does not require users to install the .NET runtime
 
 ## Building on Arch Linux
@@ -45,7 +41,7 @@ The game still receives a valid mutex handle, but the named single-instance mute
 Install the build dependencies:
 
 ```bash
-sudo pacman -S --needed dotnet-sdk mingw-w64-gcc
+sudo pacman -S --needed dotnet-sdk
 ```
 
 Publish a Release build:
@@ -66,8 +62,6 @@ artifacts/publish/Gw2Launcher.exe
 artifacts/publish/Gw2Launcher.dll.config
 artifacts/publish/Gw2Launcher.pdb
 ```
-
-The project builds `Gw2Launcher/Resources/version_proxy.dll` automatically and embeds it into the launcher executable.
 
 ## Automated builds and releases
 
