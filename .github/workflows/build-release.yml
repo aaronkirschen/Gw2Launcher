@@ -65,7 +65,7 @@ jobs:
           )
 
       - name: Upload test artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Gw2Launcher-win-x64
           path: |
@@ -84,7 +84,7 @@ jobs:
 
     steps:
       - name: Download tested artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v7
         with:
           name: Gw2Launcher-win-x64
           path: artifacts
